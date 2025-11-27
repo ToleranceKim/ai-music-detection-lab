@@ -28,6 +28,7 @@
 
 ## 프로젝트 구조
 
+```
 music-detection-lab/
 ├── docs/
 │   ├── development_plan.md  # 개발 계획서
@@ -55,6 +56,7 @@ music-detection-lab/
 ├── requirements.txt        # pip 의존성
 ├── pyproject.toml         # 프로젝트 설정 (uv 사용)
 └── uv.lock               # uv 락 파일
+```
 
 ## 시작하기
 
