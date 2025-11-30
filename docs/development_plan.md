@@ -16,7 +16,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 ### 기술 스택
 - **Python**: 3.12
 - **PyTorch**: 2.2.2
-- **Audio**:librosa 0.11.0, torchaudio
+- **Audio**: librosa 0.11.0, torchaudio
 - **Web**: Streamlit
 - **Package Manager**: uv
 
@@ -34,7 +34,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 
 ## Phase 2: 공통 유틸리티 모듈 (진행중)
 
-### 2.1 오디오 I/O ('src/common/audio_io.py)
+### 2.1 오디오 I/O (`src/common/audio_io.py`)
 
 **목적**: 오디오 파일 로딩 및 전처리 표준화
 
@@ -42,7 +42,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 - `load_audio(file_path, sr=22050)` - 오디오 로딩 및 리샘플링
 - `save_audio(audio, sr, file_path)` - 오디오 저장
 - `split_audio(audio, sr, segment_duration=10)` - 세그먼트 분할
-- `normarlize_audio(audio)` - 정규화
+- `normalize_audio(audio)` - 정규화
 
 ### 2.2 특징 추출 (`src/common/features.py`)
 
@@ -89,7 +89,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 ### 3.2 모델 구현 (`src/sunday/model.py`)
 
 ```python
-class sundayDtector(nn.Module):
+class SundayDetector(nn.Module):
     def __init__(self):
         # ResNet18 backbone
         # Binary classification head
@@ -105,5 +105,109 @@ class sundayDtector(nn.Module):
 ```python
 class FakeMusicCapsDataset(Dataset):
     def __init__(self, root_dir, split='train', augment=False):
-        
+        # 데이터 로딩
+        # 전처리 파이프라인
 ```
+
+### 3.4 학습 스크립트 ('src/sunday/train.py')
+
+**학습 설정**:
+- Optimizer : Adam (lr=le-4)
+- Loss: Binary Cross Entropy
+- Epochs: 50
+- Batch size: 32
+
+### 3.5 평가 ('src/sunday/evaluate.py')
+
+**평가 시나리오**:
+1. Clean test set
+2. Pitch-shifted test set
+3. Tempo-stretched test set
+4. Combined augmentation
+
+**예상 소요 시간**: 1주일
+
+---
+
+## Phase 4: Afchar 논문 재현
+
+### 4.1 데이터셋 준비
+
+**옵션**:
+1. FMA (Free Music Archive) 사용
+2. FakeMusicCaps 재사용
+3. Custom Dataset 구성
+
+### 4.2 오토인코더 모델 (`src/afchar/model.py`)
+
+```python
+class AfcharAutoencoder(nn.Module):
+    def __init__(self):
+        # Encoder network
+        # Decoder network
+
+class AfcharDatector(nn.Module):
+    def __init__(self):
+        # Raconstruction error 기반 탐지
+```
+
+**아키텍처**:
+- Encoder: Conv layers -> Latent space
+- Decoder: Deconv layers -> Reconstruction
+- Detection: Reconstruction error threshold
+
+### 4.3 학습 파이프라인 (`src/afchar/train.py`)
+
+**2단계 학습**:
+1. Autoencoder 학습 (정상 음악만)
+2. Threshold 학습 (정상 vs AI 생성)
+
+### 4.4 평가 (`src/afchar/evaluate.py`)
+
+**비교 실험**:
+- Sunday 모델과 동일 테스트셋
+- 일반화 성능 비교
+- 계산 효율성 비교
+
+**예상 소요 시간**: 1주일
+
+---
+
+## Phase 5: 통합 및 비교 분석
+
+### 5.1 통합 평가 프레임워크 (`experiments/compare.py`)
+
+**비교 메트릭**:
+- Accuracy, Precision, Recall, F1
+- ROC-AUC, EER
+- Inference time
+- Model size
+
+### 5.2 교차 데이터셋 실험
+
+**실험 설계**:
+- Sunday 모델 -> Afchar 데이터
+- Afchar 모델 -> Sunday 데이터
+- Domain adaptation 분석
+
+### 5.3 앙상블 실험 (`experiments/ensemble.py`)
+
+**앙상블 방법**:
+- Voting ensemble
+- Weighted average
+- Stacking
+
+**예상 소요 시간**: 3-4일
+
+---
+
+## Phase 6: 데모 개발
+
+### 6.1 Streamlit 웹 앱 (`demos/app.py`)
+
+**기능**:
+- 오디오 파일 업로드
+- 실시간 분석
+- 두 모델 결과 비교
+- 시각화 (스펙트로그램, 신뢰도 점수)
+
