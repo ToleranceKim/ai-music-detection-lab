@@ -1,18 +1,18 @@
 """
 Audio Data Augmentation Module
 
-AI 생성 음악 탐지 모델의 성능 향상을 위한 데이터 증강 기법들.
-과적합을 방지하고 모델의 일반화 능력을 향상시킵니다.
-
-주요 증강 기법:
-- Time Domain: stretching, shifting, volume control
-- Frequency Domain: pitch shifting, filtering, masking
-- Noise: gaussian, background, environmental
-- Advanced: mix-up, spectral augmentation
+AI 생성 음악 탐지를 위한 데이터 증강 기법들.
 
 References:
-    - Park et al. "SpecAugment: A Simple Data Augmentation Method" (2019)
-    - Ko et al. "Audio Augmentation for Speech Recognition" (2015)
+    - Nicholas Sunday "Detecting Musical Deepfakes" (2025)
+
+Core Functions:
+    - time_stretch: 템포 변조 (0.9~1.1)
+    - pitch_shift: 피치 변조 (-2~+2 semitones)
+    - random_augment: Sunday 논문 기반 랜덤 조합
+
+Additional Functions:
+    - 실험용 증강 기법들
 """
 
 import numpy as np
@@ -22,7 +22,7 @@ import random
 from scipy import signal
 import warnings
 
-# Time Domain Augmentations
+# Core Functions (Sunday Paper-based)
 
 def time_stretch(audio: np.ndarray, sr: int, rate: float = 1.0) -> np.ndarray:
     """
@@ -61,6 +61,141 @@ def time_stretch(audio: np.ndarray, sr: int, rate: float = 1.0) -> np.ndarray:
 
     # librosa의 phase vocoder 사용
     return librosa.effects.time_stretch(audio, rate=rate)
+
+
+def pitch_shift(audio: np.ndarray, sr: int, n_steps: float = 0.0, bins_per_octave: int = 12) -> np.ndarray:
+    """
+    오디오 피치를 변경합니다. (속도는 유지)
+
+    STFT와 phase vocoder를 사용하여 템포를 유지하면서 피치만 변경합니다.
+    다양한 키의 음악에 대해 강건한 모델을 학습시킵니다.
+
+    Args:
+        audio: 입력 오디오 신호
+        sr: 샘플레이트 (Hz)
+        n_steps: 반음 단위 변경량
+            - 양수: 높은 음으로 (예: 2 = 2반음 올림)
+            - 음수: 낮은 음으로 (예: -3 = 3반음 내림)
+            - 12 = 1옥타브
+        bins_per_octave: 옥타브당 빈 수 (미세 조정용)
+
+    Returns:
+        np.ndarray: 피치 변경된 오디오
+
+    Example:
+        >>> higher = pitch_shift(audio, sr, n_steps=2) # 2반음 올리기
+        >>> lower = pitch_shift(audio, sr, n_steps=-5) # 5반음 내리기
+        >>> octave_up = pitch_shift(audio, sr, n_steps=12) # 1옥타브 올리기
+
+    Note:
+        - 극단적인 피치 변경 (±12 이상)은 아티팩트 발생 가능
+        - 실시간 처리에는 부적합 (계산량 많음)
+    """
+    if n_steps == 0:
+        return audio
+
+    return librosa.effects.pitch_shift(audio, sr=sr, n_steps=n_steps, bins_per_octave=bins_per_octave)
+
+
+def random_augment(audio: np.ndarray, sr: int,
+                  augment_probs: Optional[Dict[str, float]] = None,
+                  augment_params: Optional[Dict[str, Dict]] = None) -> np.ndarray:
+    """
+    Sunday 논문 기반 랜덤 증강 조합을 적용합니다.
+
+    Sunday 논문의 실험 설정에 따라
+    pitch_shift, time_stretch를 확률적으로 조합하여 적용합니다.
+
+    Sunday 논문의 4가지 실험 데이터셋을 시뮬레이션:
+    1. Original (증강 없음)
+    2. Pitch shifted only
+    3. Tempo stretched only
+    4. Both pitch and tempo shifted
+
+    Args:
+        audio: 입력 오디오 신호 (1차원 numpy 배열)
+        sr: 샘플레이트 (Hz)
+        augment_probs: 각 증강 기법의 적용 확률 (0~1)
+            - 'pitch_shift': 피치 변조 확률 (기본 0.5)
+            - 'time_stretch': 템포 변조 확률 (기본 0.5)
+            None인 경우 기본값 사용
+        augment_params: 각 증강 기법의 파라미터
+            - 'pitch_shift': {'min': -2, 'max': 2} (semitones)
+            - 'time_stretch': {'min': 0.9, 'max': 1.1} (rate)
+            None인 경우 논문 기본값 사용
+
+    Returns:
+        np.ndarray: 랜덤 증강이 적용된 오디오
+
+    Example:
+        >>> # 기본 설정 (50% 확률로 각 증강 적용)
+        >>> augmented = random_augment(audio, sr)
+        >>>
+        >>> # Sunday 논문 실험 1: Pitch shift only
+        >>> augmented = random_augment(audio, sr,
+        ...     augment_probs={'pitch_shift': 1.0, 'time_stretch': 0.0})
+        >>>
+        >>> # Sunday 논문 실험 2: Tempo stretch only
+        >>> augmented = random_augment(audio, sr,
+        ...     augment_probs={'pitch_shift': 0.0, 'time_stretch': 1.0})
+        >>>
+        >>> # Sunday 논문 실험 3: Both pitch and tempo
+        >>> augmented = random_augment(audio, sr,
+        ...     augment_probs={'pitch_shift': 1.0, 'time_stretch': 1.0})
+
+    Implementation Note:
+        - 각 증강은 독립적으로 확률 계산 (여러 증강 동시 가능)
+        - 증강 순서: pitch_shift → time_stretch
+        - 극단적 변형 방지를 위해 파라미터 범위 제한
+
+    Warning:
+        여러 증강을 동시에 적용하면 아티팩트가 누적될 수 있음.
+        특히 time_stretch와 pitch_shift 동시 적용 시 주의.
+
+    Reference:
+        Nicholas Sunday "Detecting Musical Deepfakes" (2025)
+    """
+    # 기본 확률 설정
+    if augment_probs is None:
+        augment_probs = {
+            'pitch_shift': 0.5,
+            'time_stretch': 0.5
+        }
+
+    # 기본 파라미터 설정 (논문 기반)
+    if augment_params is None:
+        augment_params = {
+            'pitch_shift': {'min': -2, 'max': 2},      # Sunday: ±2 semitones
+            'time_stretch': {'min': 0.9, 'max': 1.1}   # Sunday: 0.9~1.1
+        }
+
+    # 원본 복사 (비파괴적 처리)
+    augmented = audio.copy()
+
+    # 1. Pitch shift 적용 (Sunday 논문: -2 ~ +2 semitones)
+    if np.random.random() < augment_probs.get('pitch_shift', 0.5):
+        pitch_params = augment_params.get('pitch_shift', {})
+        min_steps = pitch_params.get('min', -2)
+        max_steps = pitch_params.get('max', 2)
+        n_steps = np.random.uniform(min_steps, max_steps)
+
+        augmented = pitch_shift(augmented, sr, n_steps)
+
+    # 2. Time stretch 적용 (Sunday 논문: 0.9 ~ 1.1)
+    if np.random.random() < augment_probs.get('time_stretch', 0.5):
+        stretch_params = augment_params.get('time_stretch', {})
+        min_rate = stretch_params.get('min', 0.9)
+        max_rate = stretch_params.get('max', 1.1)
+        rate = np.random.uniform(min_rate, max_rate)
+
+        augmented = time_stretch(augmented, sr, rate)
+
+    return augmented
+
+
+# =====================================
+# Additional Experimental Functions
+# =====================================
 
 def time_shift(audio: np.ndarray, sr: int, shift_ms: float = 0.0, fill_mode: str = 'zeros') -> np.ndarray:
     """
@@ -171,39 +306,6 @@ def polarity_inversion(audio: np.ndarray) -> np.ndarray:
 
 # Frequency Domain Augmentations
 
-def pitch_shift(audio: np.ndarray, sr: int, n_steps: float = 0.0, bins_per_octave: int = 12) -> np.ndarray:
-    """
-    오디오 피치를 변경합니다. (속도는 유지)
-
-    STFT와 phase vocoder를 사용하여 템포를 유지하면서 피치만 변경합니다.
-    다양한 키의 음악에 대해 강건한 모델을 학습시킵니다.
-
-    Args:
-        audio: 입력 오디오 신호
-        sr: 샘플레이트 (Hz)
-        n_steps: 반음 단위 변경량
-            - 양수: 높은 음으로 (예: 2 = 2반음 올림)
-            - 음수: 낮은 음으로 (예: -3 = 3반음 내림)
-            - 12 = 1옥타브
-        bins_per_octave: 옥타브당 빈 수 (미세 조정용)
-
-    Returns:
-        np.ndarray: 피치 변경된 오디오
-
-    Example:
-        >>> higher = pitch_shift(audio, sr, n_steps=2) # 2반음 올리기
-        >>> lower = pitch_shift(audio, sr, n_steps=-5) # 5반음 내리기
-        >>> octave_up = pitch_shift(audio, sr, n_steps=12) # 1옥타브 올리기
-
-    Note:
-        - 극단적인 피치 변경 (±12 이상)은 아티팩트 발생 가능
-        - 실시간 처리에는 부적합 (계산량 많음)
-    """
-    if n_steps == 0:
-        return audio
-
-    return librosa.effects.pitch_shift(audio, sr=sr, n_steps=n_steps, bins_per_octave=bins_per_octave)
-
 def frequency_mask(audio: np.ndarray, sr: int, freq_mask_range: Tuple[float, float] = (0, 0), mask_type: str = 'zero') -> np.ndarray:
     """
     특정 주파수 대역을 마스킹합니다.
@@ -280,20 +382,42 @@ def apply_filter(audio: np.ndarray, sr: int, filter_type: str = 'lowpass', cutof
         >>> # 고역통과 필터 (베이스 제거)
         >>> no_bass = apply_filter(audio, sr, 'highpass', 200)
 
+    Technical Note - Nyquist Frequency:
+        디지털 신호는 샘플레이트의 절반(Nyquist 주파수)까지만 표현 가능합니다.
+        예: 16kHz 샘플링 -> 최대 8kHz까지 표현
+
+        Butterworth 필터는 0~1로 정규화된 주파수를 요구:
+        - 0 = 0Hz
+        - 1 = Nyquist frequency (sr/2)
+
+        따라서: normalized_freq = actual_freq / (sr/2)
+
     Note:
         - 너무 낮은/높은 차단 주파수는 무음 생성 가능
         - order가 높으면 ringing 아티팩트 발생 가능
+        - 차단 주파수는 반드시 Nyquist 주파수 이하여야 함
     """
-    nyquist = sr / 2
+    nyquist = sr / 2 # Nyquist 주파수: 샘플레이트의 절반
 
     if filter_type == 'bandpass':
         if not isinstance(cutoff_freq, tuple):
             raise ValueError("For bandpass, cutoff_freq must be (low, high) tuple")
         low, high = cutoff_freq
+
+        # 차단 주파수가 Nyquist를 초과하는지 검사
+        if high > nyquist:
+            raise ValueError(f"Cutoff frequency {high}Hz exceeds Nyquist frequency {nyquist}Hz")
+
+        # 0~1 범위로 정규화 (Butterworth 필터 요구사항)
         low = low / nyquist
         high = high / nyquist
         b, a = signal.butter(order, [low, high], btype='band')
     else:
+        # 차단 주파수가 Nyquist를 초과하는지 검사
+        if cutoff_freq > nyquist:
+            raise ValueError(f"Cutoff frequency {cutoff_freq}Hz exceeds Nyquist frequency {nyquist}Hz")
+
+        # 0~1 범위로 정규화
         normalized_cutoff = cutoff_freq / nyquist
         b, a = signal.butter(order, normalized_cutoff, btype=filter_type)
 
@@ -301,6 +425,84 @@ def apply_filter(audio: np.ndarray, sr: int, filter_type: str = 'lowpass', cutof
     filtered = signal.filtfilt(b, a, audio)
     return filtered
 
+# Noise Augmentations
 
+def add_gaussian_noise(audio: np.ndarray, snr_db: float = 20.0) -> np.ndarray:
+    """
+    가우시안(백색) 노이즈를 추가합니다.
 
+    실제 녹음 환경의 전기적 노이즈를 시뮬레이션합니다.
+    AI 생성 음악의 과도한 깨끗함을 완화시켜 학습시킵니다.
 
+    Args:
+        audio: 입력 오디오 신호
+        snr_db: 신호 대 잡음비 (dB)
+            - 높을수록 노이즈 적음 (20dB = 노이즈 약함)
+            - 낮을수록 노이즈 많음 (5dB = 노이즈 강함)
+
+    Returns:
+        np.ndarray: 노이즈가 추가된 오디오
+
+    Technical Note - SNR 계산:
+        SNR(dB) = 10 * log10(P_signal / P_noise)
+        여기서 P는 파워(평균 제곱)
+
+        SNR 20dB = 신호가 노이즈보다 100배 강함
+        SNR 10dB = 신호가 노이즈보다 10배 강함
+        SNR 0dB = 신호와 노이즈 같은 세기
+
+    Example:
+        >>> noisy = add_gaussian_noise(audio, snr_db=15)
+    """
+    # 신호 파워 계산
+    signal_power = np.mean(audio ** 2)
+
+    # 목표 노이즈 파워 계산 (SNR 식 변형)
+    snr_linear = 10 ** (snr_db / 10)
+    noise_power = signal_power / snr_linear
+
+    # 가우시안 노이즈 생성
+    noise = np.random.randn(len(audio))
+
+    # 노이즈 스케일링
+    noise = noise * np.sqrt(noise_power)
+
+    return audio + noise
+
+def add_background_noise(audio: np.ndarray, noise_audio: np.ndarray, noise_level: float = 0.1) -> np.ndarray:
+    """
+    다른 오디오를 배경 노이즈로 추가합니다.
+
+    실제 환경음(카페, 거리, 사무실 등)을 추가하여
+    다양한 환경에서 녹음된 것처럼 시뮬레이션합니다.
+
+    Args:
+        audio: 원본 오디오 신호
+        noise_audio: 노이즈로 사용할 오디오
+        noise_level: 노이즈 믹싱 비율 (0~1)
+            - 0: 노이즈 없음
+            - 0.1: 약한 배경음
+            - 0.5: 강한 배경음
+
+    Returns:
+        np.ndarray: 배경 노이즈가 추가된 오디오
+
+    Example:
+        >>> cafe_noise = load_audio("cafe.wav")
+        >>> with_background = add_background_noise(audio, cafe_noise, 0.15)
+
+    Note:
+        - noise_audio가 짧으면 반복 재생됨
+        - noise_audio가 길면 랜덤 위치에서 잘라서 사용
+    """
+    # 길이 맞추기
+    if len(noise_audio) < len(audio):
+        # 노이즈가 짧으면 반복
+        repeats = len(audio) // len(noise_audio) + 1
+        noise_audio = np.tile(noise_audio, repeats)
+
+    # 같은 길이로 자르기
+    noise_audio = noise_audio[:len(audio)]
+
+    # 노이즈 레벨 적용하여 믹싱
+    return audio + noise_audio * noise_level

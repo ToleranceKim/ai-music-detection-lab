@@ -60,7 +60,6 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 **구현 함수**:
 - `pitch_shift(audio, sr, n_steps)` - 피치 변조 (-2 ~ +2 semitones)
 - `time_stretch(audio, rate)` - 템포 변조 (0.9 ~ 1.1)
-- `add_noise(audio, noise_factor=0.005)` - 노이즈 추가
 - `random_augment(audio, sr)` - 랜덤 증강 조합
 
 ### 2.4 평가 메트릭 (`src/common/metrics.py`)
