@@ -126,4 +126,4 @@ pip install -r requirements.txt
 - Nicholas Sunday의 코드: MIT License
 - Deezer Research의 코드: CC-BY-NC-4.0
 
-자세한 내용은 [LICENSE](LICENSE) 및 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES) 파일을 참고하세요.
+자세한 내용은 [LICENSE](LICENSE) 및 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES.md) 파일을 참고하세요.

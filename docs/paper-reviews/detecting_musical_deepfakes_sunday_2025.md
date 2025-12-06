@@ -5,20 +5,19 @@
 - tags: [AI Music Detection, Deepfake, FakeMusicCaps, ResNet18]
 ---
 
-# 리뷰를 시작하며
-
-현재 AI 생성 음악을 둘러싼 연구는 생성 음악 탐지, 워터마킹과 인증, 데이터 포이즈닝 공격과 방어 등 여러 방향에서 진행되고 있습니다. 
-
-이 블로그에서는 그 가운데 특히 (1) 플랫폼이나 서비스 단계에서 생성 음악을 식별하는 AI Music Detection과 (2) 학습 데이터 자체를 방어하려는 Unlearnable Data와 Defensive Data Poisoning 두 축에 초점을 맞추어 논문을 리뷰할 예정입니다. AI 생성 음악이 음악 생태계에 던지는 더 넓은 질문에 대한 저의 생각과 이 블로그의 문제의식은 별도의 글에서 다룰 예정입니다.
-
-오늘은 최신 AI Music Detection 연구의 성과를 직관적으로 엿볼 수 있는 논문을 통해 생성 음악 식별 기술을 체험하고 분석하는데 집중해보겠습니다.
-
-오늘 다룰 Nicholas Sunday의 「Detecting Musical Deepfakes」는 FakeMusicCaps 기반 오디오를 멜 스펙트로그램으로 변환하고 ResNet18 분류기를 학습하는 직관적인 베이스라인을 제안합니다. 전체 파이프라인이 GitHub에 공개되어 있어 실험 재현과 변형 시도가 용이하고, Afchar 등 Deezer 연구와 SONICS, FakeMusicCaps 논문을 주요 선행 연구로 검토한 뒤 Afchar 논문에서 다룬 피치 쉬프트와 템포 스트레치 조작 시나리오를 FakeMusicCaps와 ResNet18 구성에서 다시 실험한다는 점에서, 이후 AI Music Detection 시리즈에서 다룰 보다 복잡한 모델 방어 기법을 이해하기 위한 기준선으로 적합하다고 판단했습니다.
-
-이 리뷰에서는 공개 코드를 직접 재현하고 실행한 경험을 바탕으로, Sunday가 제안한 설정이 어느 지점에서 유효하고 어떤 부분에서 한계를 보이는지 확인합니다.
-
-
 # Detecting Musical Deepfakes: FakeMusicCaps와 ResNet18으로 살펴본 음악 딥페이크 탐지
+
+## 리뷰를 시작하며
+
+첫 리뷰로써 AI Music Detection 쪽에서 구현과 실험 구성이 비교적 직관적인 논문을 함께 탐구해 보려고 합니다. 복잡한 모델과 방어 기법으로 바로 들어가기보다는, 재현 가능한 예제를 통해 “생성 음악을 기계가 어떻게 구분하는지”를 먼저 체감해 보는 것이 목표입니다.
+
+오늘 다룰 Nicholas Sunday의 「Detecting Musical Deepfakes」는 FakeMusicCaps 데이터셋의 오디오를 Mel Spectrogram으로 변환한 뒤 ResNet18 이진 분류기를 학습하는 기본적인 탐지 파이프라인을 제안합니다. 전체 파이프라인이 GitHub에 공개되어 있어 코드를 내려받아 곧바로 학습과 평가를 재현해 볼 수 있고, 실험 설정을 바꾸어 보기도 쉽습니다.
+
+Sunday는 Afchar 등 Deezer 연구와 SONICS, FakeMusicCaps 논문을 주요 관련 연구로 검토하고, Deezer 연구에서 사용된 조작 시나리오를 바탕으로 피치 쉬프트와 템포 스트레치 같은 단순 효과가 탐지 성능을 얼마나 흔들 수 있는지를 FakeMusicCaps와 ResNet18 구성에서 다시 시험합니다.
+
+이 리뷰에서는 파이프라인을 실제로 실행해 본 경험을 바탕으로, 이 구성이 AI Music Detection을 이해하기 위한 직관적인 출발점으로서 어느 정도까지 유효한지, 또 어떤 한계를 드러내는지를 정리합니다.
+
+> 핵심 요약
 > Sunday의  「Detecting Musical Deepfakes」는 FakeMusicCaps 데이터셋과 Mel Spectrogram + ResNet18 이진 분류기를 사용해 사람vs딥페이크 음악 탐지 문제를 실험적으로 분석한 연구입니다. 논문에 따르면, 10초 단위 오디오 클립 10,746개(사람 5,373 / 딥페이크 5,373)를 학습과 평가에 사용했을 때 모든 실험에서 F1, Accuracy, Recall, Precision이 80%를 상회하는 비교적 높은 성능을 달성합니다. 또한 Deezer 연구를 참조해 피치 쉬프트와 템포 스트레치 같은 단순 조작이 탐지 성능을 얼마나 떨어뜨리는지 측정하고 여러 조작 데이터셋을 연속적으로 학습하는 Continuous Learning 설정이 사람 음악 재현율을 높이는 대신 오탐률을 크게 증가시키는 트레이드오프를 보여 줍니다.
 
 ---
