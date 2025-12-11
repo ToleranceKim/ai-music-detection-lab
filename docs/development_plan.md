@@ -72,8 +72,26 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 - `calculate_eer(predictions, labels)` - Equal Error Rate
 - `plot_confusion_matrix(predictions, labels)`
 
-**예상 소요 시간**: 3-4일
+### 2.5 전처리 파이프라인 (`src/common/preprocess.py`)
 
+**목적**: 데이터셋 준비 및 모델 입력 형식 변환
+
+**Sunday 논문에서 확인된 사항**:
+- Mel-spectrogram 변환 (librosa 사용)
+- ImageNet 정규화: mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+- 데이터셋 분할: Train 8,599 / Val 1,075 / Test 1,074
+
+**구현 함수**:
+- `normalize_for_imagenet(tensor)` - ImageNet 정규화 적용
+- `split_fakemusiccaps(data_dir)` - 논문 기준 데이터셋 분할
+- `prepare_mel_for_resnet18(mel_spec)` - ResNet18 입력 변환
+    - 논문 미명시 사항 (실험 필요):
+        - 입력 크기 (224x224 추정)
+        - 채널 변환 방식 (1ch → 3ch 방법)
+
+**참고**: 
+- 입력 크기와 채널 변환은 논문에 명시되지 않아 일반적인 ResNet18 관행 따름
+- Sunday GitHub 코드 확인 시 업데이트 예정
 ---
 
 ## Phase 3: Sunday 논문 재현
@@ -126,8 +144,6 @@ class FakeMusicCapsDataset(Dataset):
 4. Combined augmentation
 5. Continuous Learning (Base -> Pitch -> Tempo -> PitchTempo)
 
-**예상 소요 시간**: 1주일
-
 ---
 
 ## Phase 4: Afchar 논문 재현
@@ -170,8 +186,6 @@ class AfcharDetector(nn.Module):
 - 일반화 성능 비교
 - 계산 효율성 비교
 
-**예상 소요 시간**: 1주일
-
 ---
 
 ## Phase 5: 통합 및 비교 분석
@@ -198,8 +212,6 @@ class AfcharDetector(nn.Module):
 - Weighted average
 - Stacking
 
-**예상 소요 시간**: 3-4일
-
 ---
 
 ## Phase 6: 데모 개발
@@ -219,8 +231,6 @@ python detect.py --model sunday --input audio.wav
 python detect.py --model afchar --input audio.wav
 python detect.py --model ensemble --input audio.wav
 ```
-
-**예상 소요 시간**: 2-3일
 
 ---
 
