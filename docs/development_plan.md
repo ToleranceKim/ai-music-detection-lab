@@ -59,7 +59,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 
 **구현 함수**:
 - `pitch_shift(audio, sr, n_steps)` - 피치 변조 (-2 ~ +2 semitones)
-- `time_stretch(audio, rate)` - 템포 변조 (0.9 ~ 1.1)
+- `time_stretch(audio, rate)` - 템포 변조 (0.8 ~ 1.2)
 - `random_augment(audio, sr)` - 랜덤 증강 조합
 
 ### 2.4 평가 메트릭 (`src/common/metrics.py`)
@@ -83,7 +83,7 @@ AI 생성 음악 탐지 연구를 위한 기술 개발 계획서
 **FakeMusicCaps 데이터셋**
 - 다운로드 및 구조 파악
 - 메타데이터 파싱
-- Train/Val/Test 분할 (60/20/20)
+- Train/Val/Test 분할 8,599/1,075/1,074
 
 ### 3.2 모델 구현 (`src/sunday/model.py`)
 
@@ -95,8 +95,9 @@ class SundayDetector(nn.Module):
 ```
 
 **아키텍처**:
-- Backbone: ResNet18 (ImageNet pretrained)
-- Input: Mel-spectrogram (128 x T)
+- Backbone: ResNet18 (ImageNet1k v1 pretrained)
+- Input: Mel-spectrogram (3-channel RGB conversion)
+- Normalization: ImageNet mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
 - Output: Binary (Real/Fake)
 
 ### 3.3 데이터 로더 (`src/sunday/dataset.py`)
@@ -108,21 +109,22 @@ class FakeMusicCapsDataset(Dataset):
         # 전처리 파이프라인
 ```
 
-### 3.4 학습 스크립트 ('src/sunday/train.py')
+### 3.4 학습 스크립트 (`src/sunday/train.py`)
 
 **학습 설정**:
-- Optimizer : Adam (lr=le-4)
+- Optimizer : Adam (lr=1e-4)
 - Loss: Binary Cross Entropy
-- Epochs: 50
+- Epochs: 20
 - Batch size: 32
 
-### 3.5 평가 ('src/sunday/evaluate.py')
+### 3.5 평가 (`src/sunday/evaluate.py`)
 
 **평가 시나리오**:
 1. Clean test set
 2. Pitch-shifted test set
 3. Tempo-stretched test set
 4. Combined augmentation
+5. Continuous Learning (Base -> Pitch -> Tempo -> PitchTempo)
 
 **예상 소요 시간**: 1주일
 
@@ -145,9 +147,9 @@ class AfcharAutoencoder(nn.Module):
         # Encoder network
         # Decoder network
 
-class AfcharDatector(nn.Module):
+class AfcharDetector(nn.Module):
     def __init__(self):
-        # Raconstruction error 기반 탐지
+        # Reconstruction error 기반 탐지
 ```
 
 **아키텍처**:
@@ -210,7 +212,7 @@ class AfcharDatector(nn.Module):
 - 두 모델 결과 비교
 - 시각화 (스펙트로그램, 신뢰도 점수)
 
-### 6.2 CLI ehrn (`demos/cli.py`)
+### 6.2 CLI 도구 (`demos/cli.py`)
 
 ```bash
 python detect.py --model sunday --input audio.wav
