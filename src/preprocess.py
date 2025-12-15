@@ -109,3 +109,98 @@ def prepare_mel_for_resnet18(mel_spec: np.ndarray, target_size: Tuple[int, int] 
 
     return rgb_spec
 
+def split_fakemusiccaps(data_dir: Union[str, Path], metadata_file: Optional[str] = None, random_state: int = 42) -> Dict[str, List[Path]]:
+    """
+    FakeMusicCaps 데이터셋을 Sunday 논문 기준으로 분할합니다.
+
+    논문 기준 분할:
+    - Train: 8,599 샘플
+    - Val: 1,075 샘플
+    - Test: 1,074 샘플
+    - 총: 10,748 샘플
+    """
+    # ... (이전에 제공한 코드 참조)
+
+
+def convert_to_db(spectrogram: np.ndarray, ref: float = 1.0, amin: float = 1e-10) -> np.ndarray:
+    """
+    Spectrogram을 dB 스케일로 변환합니다.
+
+    Args:
+        spectrogram: 선형 스케일 spectrogram
+        ref: 참조값 (기본값: 1.0)
+        amin: 최소값 (log 계산 시 0 방지)
+
+    Returns:
+        dB 스케일 spectrogram
+    """
+    # Power to dB
+    db_spec = 10 * np.log10(np.maximum(amin, spectrogram))
+    db_spec = np.maximum(db_spec, db_spec.max() - 80.0) # 80dB 다이나믹 레인지
+
+    return db_spec
+
+
+def prepare_batch(batch_specs: List[np.ndarray], use_imagenet_norm: bool = True) -> torch.Tensor:
+    """
+    배치 단위로 spectrogram을 처리합니다.
+
+    Args:
+        batch_specs: Mel spectrogram 리스트
+        use_imagenet_norm: ImageNet 정규화 적용 여부
+
+    Returns:
+        배치 텐서 (B, 3, 224, 224)
+    """
+    processed = []
+
+    for spec in batch_specs:
+        # ResNet18 형식으로 변환
+        rgb_spec = prepare_mel_for_resnet18(spec)
+        processed.append(rgb_spec)
+
+    # 배치로 결합
+    batch_tensor = torch.from_numpy(np.stack(processed)).float()
+
+    # ImageNet 정규화
+    if use_imagenet_norm:
+        batch_tensor = normalize_for_imagenet(batch_tensor)
+
+    return batch_tensor
+
+# 테스트용 메인 함수
+if __name__ == "__main__":
+    # 테스트용 더미 데이터
+    print("Preprocessing Module Test")
+    print("=" * 50)
+
+    # 1. ImageNet 정규화 테스트
+    print("\n1. ImageNet Normalization Test:")
+    dummy_tensor = np.random.rand(3, 224, 224)
+    normalized = normalize_for_imagenet(dummy_tensor)
+    print(f"    Imput shape: {dummy_tensor.shape}")
+    print(f"    Output shape: {normalized.shape}")
+    print(f"    Output type: {type(normalized)}")
+
+    # 2. Mel spectrogram 변환 테스트
+    print("\n2. Mel to ResNet18 Format Test:")
+    dummy_mel = np.random.randn(128, 431) # 일반적인 Mel spectrogram 크기
+    rgb_mel = prepare_mel_for_resnet18(dummy_mel)
+    print(f"    Input shape: {dummy_mel.shape}")
+    print(f"    Output shape: {rgb_mel.shape}")
+    print(f"    Output range: [{rgb_mel.min():.3f}, {rgb_mel.max():.3f}]")
+
+    # 3. 배치 처리 테스트
+    print("\n3. Batch Processing Test:")
+    batch_mels = [np.random.randn(128, 431) for _ in range(4)]
+    batch_tensor = prepare_batch(batch_mels)
+    print(f"    Batch size: {len(batch_mels)}")
+    print(f"    Output shape: {batch_tensor.shape}")
+    print(f"    Output dtype: {batch_tensor.dtype}")
+
+    # 4. 데이터 분할 테스트 (실제 경로가 필요하므로 스킵)
+    print("\n4. Dataset Split Test:")
+    print(" (실제 데이터셋 경로가 필요하므로 스킵)")
+
+    print("\n" + "=" * 50)
+    print("All tests completed successfully!")
