@@ -119,7 +119,65 @@ def split_fakemusiccaps(data_dir: Union[str, Path], metadata_file: Optional[str]
     - Test: 1,074 샘플
     - 총: 10,748 샘플
     """
-    # ... (이전에 제공한 코드 참조)
+    data_dir = Path(data_dir)
+
+    # 메타데이터 파일이 제공된 경우
+    if metadata_file:
+        with open(metadata_file, 'r') as f:
+            metadata = json.load(f)
+
+        # 메타데이터에서 split 정보가 있는 경우
+        if 'splits' in metadata:
+            return {
+                'train': [Path(p) for p in metadata['splits']['train']],
+                'val': [Path(p) for p in metadata['splits']['val']],
+                'test': [Path(p) for p in metadata['splits']['test']]
+            }
+
+    # 오디오 파일 수집 (MP3, WAV, FLAC)
+    audio_files = []
+    for ext in ['*.mp3', '*.wav', '*.flac']:
+        audio_files.extend(list(data_dir.rglob(ext)))
+
+    # 파일 개수 검증
+    total_files = len(audio_files)
+    expected_total = 10748
+
+    if total_files != expected_total:
+        print(f"경고: 파일 개수({total_files})가 논문 기준({expected_total})과 다릅니다.")
+        print(f"실제 비율로 분할합니다.: Train 80%, Val 10%, Test 10%")
+
+    # 정렬하여 일관성 유지
+    audio_files.sort()
+
+    # 랜덤 시드 설정
+    random.seed(random_state)
+    np.random.seed(random_state)
+
+    # sklearn으로 분할
+    train_files, test_val_files = train_test_split(audio_files, test_size=0.2, random_state=random_state) # Val + Test
+    val_files, test_files = train_test_split(test_val_files, test_size = 0.5, random_state=random_state) # Val과 Test를 반반
+
+    # 정확한 개수로 조정 (가능한 경우)
+    if total_files == expected_total:
+        train_files = train_files[:8599]
+        val_files = val_files[:1075]
+        test_files = test_files[:1074]
+
+    splits = {
+        'train': train_files,
+        'val': val_files,
+        'test': test_files
+    }
+
+    # 분할 결과 출력
+    print(f"데이터셋 분할 완료:")
+    print(f"    Train: {len(splits['train'])} 샘플")
+    print(f"    Val: {len(splits['val'])} 샘플")
+    print(f"    Test: {len(splits['test'])} 샘플")
+    print(f"    Total: {sum(len(s) for s in splits.values())} 샘플")
+
+    return splits
 
 
 def convert_to_db(spectrogram: np.ndarray, ref: float = 1.0, amin: float = 1e-10) -> np.ndarray:
